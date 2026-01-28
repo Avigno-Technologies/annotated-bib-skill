@@ -57,3 +57,4 @@ Each bibliography entry captures:
 - Entry formatting templates
 - Best practices for context-efficient research synthesis
 - Integration guidance with other document creation skills
+- File(s) available in *.skill format as well as the *.md and python scripts
