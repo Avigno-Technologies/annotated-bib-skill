@@ -1,131 +1,159 @@
 ---
 name: annotated-bibliography
-description: Create and manage annotated bibliographies for research projects. Use when building literature reviews, gathering sources on a topic, or organizing research with citations and key findings. Handles web search → URL collection → content fetching → structured annotation workflow. Ideal for research synthesis that spans multiple sessions or hits context limits.
+description: Create and manage annotated bibliographies for any research domain. Use when building literature reviews, gathering sources on a topic, organizing research citations with key findings, or synthesizing references across sessions. Supports PMID/DOI detection, deduplication, tags, search, and JSON export. Works cross-platform (Windows, macOS, Linux).
+version: 2.0.0
 ---
 
 # Annotated Bibliography Skill
 
 Build research bibliographies efficiently across sessions without context bloat.
 
-## Workflow Overview
+## Workflow
 
-1. **Search** → Use web_search to find sources, collect URLs
-2. **Fetch** → Use web_fetch to get content, pipe to format_entry.py
-3. **Annotate** → Add key findings via manage_bib.py or directly
-4. **Repeat** → Append new topics to same bibliography file
-5. **Synthesize** → Generate clean summary when ready to write
+1. **Search** -- Find sources via web search, collect URLs
+2. **Fetch** -- Retrieve content via web fetch, pipe to format_entry.py
+3. **Annotate** -- Add key findings immediately (do not defer)
+4. **Repeat** -- Append new entries to the same bibliography file
+5. **Synthesize** -- Generate clean summary for writing
 
 ## Quick Start
 
-### Single Entry (inline)
+### Create a new bibliography
+
 ```bash
-# After web_fetch, save content to JSON and format
-echo '{"url": "https://example.com/article", "content": "Article text here..."}' | \
-  python3 scripts/format_entry.py -o bibliography.md -t "Topic Name"
+echo '{"url": "https://example.com/article", "content": "Article text..."}' | \
+  python scripts/format_entry.py -o bibliography.md -t "Research Topic"
 ```
 
-### Batch Processing
-```bash
-# Append additional entries
-echo '{"url": "...", "content": "..."}' | \
-  python3 scripts/format_entry.py -o bibliography.md -a
+### Append an entry with annotation and tags
 
-# With annotation
+```bash
 echo '{"url": "...", "content": "..."}' | \
-  python3 scripts/format_entry.py -o bibliography.md -a --annotation "Key finding: X reduces Y by 50%"
+  python scripts/format_entry.py -o bibliography.md -a \
+    --annotation "Key finding: X reduces Y by 50%" \
+    --tags "RCT,nutrition,meta-analysis"
 ```
 
-## Scripts
+### Manage entries
+
+```bash
+# List all entries ([x] = annotated, [ ] = needs annotation)
+python scripts/manage_bib.py list bibliography.md
+
+# Show only unannotated entries
+python scripts/manage_bib.py list bibliography.md -u
+
+# Search across titles, URLs, annotations, and tags
+python scripts/manage_bib.py search bibliography.md "allostatic load"
+python scripts/manage_bib.py search bibliography.md "cortisol" --tags "RCT"
+
+# Add annotation by entry ID or URL substring
+python scripts/manage_bib.py annotate bibliography.md AB001 "N=500 RCT showing 40% improvement"
+python scripts/manage_bib.py annotate bibliography.md "nature.com/123" "Key finding text"
+
+# Show statistics (entry counts, tag distribution, sources)
+python scripts/manage_bib.py stats bibliography.md
+
+# Generate summary (markdown or JSON)
+python scripts/manage_bib.py summary bibliography.md -o summary.md
+python scripts/manage_bib.py summary bibliography.md --format json
+```
+
+Note: Use `python` on all platforms. Claude Code's Bash tool resolves the correct interpreter.
+
+## Scripts Reference
 
 ### format_entry.py
 
-Formats fetched content into structured bibliography entries.
+Format fetched content into structured bibliography entries.
 
-**Input:** JSON via stdin or file with `url` and `content` fields
+**Input:** JSON via stdin or file with `url` and `content` fields.
 
-**Arguments:**
-- `--input, -i` - Input JSON file
-- `--output, -o` - Output markdown file
-- `--append, -a` - Append to existing file
-- `--topic, -t` - Section header (for new files)
-- `--annotation` - Add key findings text
-- `--title` - Override extracted title
-- `--authors` - Override authors (comma-separated)
-- `--date` - Override date
+| Flag | Description |
+|------|-------------|
+| `--input, -i` | Input JSON file (alternative to stdin) |
+| `--output, -o` | Output markdown file |
+| `--append, -a` | Append to existing file (with dedup check) |
+| `--topic, -t` | Section header for new files |
+| `--annotation` | Key findings text |
+| `--title` | Override extracted title |
+| `--authors` | Override authors (comma-separated) |
+| `--date` | Override date |
+| `--tags` | Comma-separated tags (rendered as #tag) |
+| `--json` | Output structured JSON instead of markdown |
+| `--force` | Skip deduplication check |
+
+**Features:**
+- **Entry IDs**: Each entry receives a sequential ID (AB001, AB002, ...) for reliable referencing
+- **PMID/DOI detection**: Automatically extracts from PubMed/PMC URLs and content text; renders as clickable links
+- **Deduplication**: Skips URLs already present in the bibliography (override with `--force`)
+- **Smart truncation**: Preserves beginning (title/abstract) and end (conclusions) of long content
 
 ### manage_bib.py
 
-Manage and annotate bibliography files.
+Manage, search, and export bibliography files.
 
-```bash
-# List entries (✓=annotated, ○=needs annotation)
-python3 scripts/manage_bib.py list bibliography.md
-
-# Show only unannotated
-python3 scripts/manage_bib.py list bibliography.md -u
-
-# Add annotation (match URL substring)
-python3 scripts/manage_bib.py annotate bibliography.md "nature.com/123" "Key finding text"
-
-# Generate clean summary
-python3 scripts/manage_bib.py summary bibliography.md -o summary.md
-```
-
-## Recommended Workflow for Research Projects
-
-### Phase 1: Collect URLs
-After each web_search, save promising URLs to a tracking file:
-```bash
-echo "https://pmc.ncbi.nlm.nih.gov/articles/PMC123/" >> urls_topic1.txt
-```
-
-### Phase 2: Fetch and Format
-For each URL, use web_fetch then pipe content to formatter:
-```python
-# Pattern: fetch content, extract key text, format entry
-content = fetch_result['text']  # from web_fetch
-entry_json = json.dumps({"url": url, "content": content})
-# Then run format_entry.py
-```
-
-### Phase 3: Annotate
-Review entries and add findings:
-```bash
-python3 scripts/manage_bib.py annotate bib.md "pmc.ncbi" "N=500 RCT showing 40% improvement"
-```
-
-### Phase 4: Synthesize
-Generate summary for writing:
-```bash
-python3 scripts/manage_bib.py summary bibliography.md -o synthesis_ready.md
-```
-
-## Context-Efficient Pattern
-
-When approaching context limits:
-1. Save current progress to bibliography file
-2. On resume: load only summary.md (not full bibliography)
-3. Full content stays in files, not context window
+| Command | Description |
+|---------|-------------|
+| `list FILE` | List all entries with annotation status |
+| `list FILE -u` | List only unannotated entries |
+| `search FILE QUERY` | Search titles, URLs, annotations, tags |
+| `search FILE QUERY --tags T` | Filter search results by tag |
+| `annotate FILE PATTERN TEXT` | Add annotation by entry ID or URL substring |
+| `stats FILE` | Entry counts, tag distribution, source breakdown |
+| `summary FILE` | Generate summary of annotated entries |
+| `summary FILE --format json` | Export annotated entries as JSON |
+| `summary FILE -o OUT` | Write summary to file |
 
 ## Entry Format
 
 ```markdown
-### Author (2024). **Title**. *source.com*
-**URL:** https://...
+### [AB001] Author (2024). **Title**. *source.com*
+**URL:** https://example.com/article
+**PMID:** [12345678](https://pubmed.ncbi.nlm.nih.gov/12345678/) | **DOI:** [10.1234/example](https://doi.org/10.1234/example)
+**Tags:** #nutrition #RCT #meta-analysis
 
 **Key Findings:**
-Annotation text here
+1. Primary finding with effect size
+2. Secondary finding with clinical relevance
+3. Limitation or caveat
 
-<details><summary>Content preview</summary>
+<details><summary>Content preview (click to expand)</summary>
+
 ```
-Full extracted text...
+Extracted text from source...
 ```
 </details>
 ```
 
+All fields except URL are optional. Entries without IDs, tags, or identifiers still parse correctly (backward compatible with v1 bibliographies).
+
+## Recommended Workflow
+
+### Phase 1: Collect URLs
+After each web search, save promising URLs to a tracking list or add entries directly.
+
+### Phase 2: Fetch and Format
+For each URL, fetch content and pipe to the formatter. Annotate immediately -- do not defer annotation to end of session.
+
+### Phase 3: Search and Organize
+Use `search` and `stats` to identify gaps. Filter by tags to focus on specific subtopics.
+
+### Phase 4: Synthesize
+Generate a summary for writing. Use `--format json` for programmatic downstream processing.
+
+## Context-Efficient Pattern
+
+When approaching context limits:
+1. Save current progress to the bibliography file
+2. On resume: load only `summary.md` (not the full bibliography)
+3. Full content stays in files, not the context window
+
 ## Tips
 
-- Annotate as you go - don't wait until end
-- Use URL substrings for matching (e.g., "PMC123" not full URL)
-- Topic headers help organize multi-gap research
-- Summary output excludes unannotated entries
+- Annotate entries immediately after fetching -- do not batch annotations
+- Match entries by ID (AB001) for reliability, URL substrings as fallback
+- Use tags consistently across entries for effective filtering
+- Topic headers help organize multi-gap research within a single file
+- The `summary` command excludes unannotated entries
+- Use `--json` output for integration with other tools or scripts
